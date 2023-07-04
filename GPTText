@@ -1,0 +1,243 @@
+Folder structure:
+
+flask_data_validation/
+    |-- flask_data_validation/
+        |-- __init__.py
+        |-- decorators/
+            |-- __init__.py
+            |-- validation_decorator.py
+        |-- models/
+            |-- __init__.py
+            |-- schema.py
+            |-- fields.py
+        |-- controllers/
+            |-- __init__.py
+            |-- validator.py
+            |-- error_handler.py
+    |-- tests/
+        |-- __init__.py
+        |-- test_validations.py
+        |-- test_schemas.py
+    |-- docs/
+    |-- setup.py
+    |-- README.md
+
+
+flask_data_validation/controllers/validator.py:
+
+class DataValidator:
+    def __init__(self, schema, data):
+        self.schema = schema
+        self.data = data
+
+    def validate(self):
+        errors = {}
+        for field_name, field in self.schema.fields.items():
+            value = self.data.get(field_name)
+            if value is None and field.required:
+                errors[field_name] = 'This field is required.'
+            elif value is not None:
+                is_valid, error_message = field.validate(value)
+                if not is_valid:
+                    errors[field_name] = error_message
+        return errors
+
+flask_data_validation/decorators/validation_decorator.py
+
+from functools import wraps
+from flask import request, jsonify
+from flask_data_validation.controllers.validator import DataValidator
+
+def validate_form(schema):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            data = request.get_json()
+            errors = DataValidator(schema, data).validate()  # Updated line
+            if errors:
+                return jsonify(errors), 400
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+flask_data_validation/models/schema.py
+
+import re
+
+class Schema:
+    def __init__(self, schema):
+        self.schema = schema
+        self.fields = schema
+
+    def validate(self, data):
+        errors = {}
+        for field, rules in self.schema.items():
+            value = data.get(field)
+            field_errors = []
+
+            if rules.get('required') and not value:
+                field_errors.append('This field is required.')
+
+            if 'type' in rules and not self.validate_type(value, rules['type']):
+                field_errors.append(f'Expected a {rules["type"]}.')
+
+            if 'validators' in rules:
+                for validator in rules['validators']:
+                    validator_name = validator['name']
+                    validator_func = getattr(self, f'validate_{validator_name}')
+                    validator_args = validator.get('args', ())
+                    validator_kwargs = validator.get('kwargs', {})
+
+                    if not validator_func(value, *validator_args, **validator_kwargs):
+                        field_errors.append(validator['message'])
+
+            if field_errors:
+                errors[field] = field_errors[0] if len(field_errors) == 1 else field_errors
+
+        return errors
+
+    def validate_type(self, value, expected_type):
+        if expected_type == 'string':
+            return isinstance(value, str)
+        elif expected_type == 'integer':
+            return isinstance(value, int)
+        elif expected_type == 'float':
+            return isinstance(value, float)
+        elif expected_type == 'boolean':
+            return isinstance(value, bool)
+        # Add more type validations as needed
+
+    def validate_email(self, value):
+        if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', value):
+            return False, 'Invalid email address.'
+        return True, None
+
+    def validate_age(self, value, min_age, max_age):
+        # Implement age validation logic here
+        pass
+
+    def validate_password(self, value, min_length=8):
+        # Implement password validation logic here
+        pass
+
+    def validate_json(self, value):
+        # Implement JSON validation logic here
+        pass
+
+flask_data_validation/models/fields.py
+
+import re
+
+class Field:
+    def __init__(self, required=False, type=None, validators=None):
+        self.required = required
+        self.type = type
+        self.validators = validators or []
+
+    def validate(self, value):
+        if self.required and value is None:
+            return False, 'This field is required.'
+
+        if self.type:
+            if self.type == 'string' and not isinstance(value, str):
+                return False, 'Expected a string.'
+            elif self.type == 'integer' and not isinstance(value, int):
+                return False, 'Expected an integer.'
+            elif self.type == 'float' and not isinstance(value, float):
+                return False, 'Expected a float.'
+            elif self.type == 'boolean' and not isinstance(value, bool):
+                return False, 'Expected a boolean.'
+            # Add more type validations as needed
+
+        for validator in self.validators:
+            validator_name = validator['name']
+            validator_func = getattr(self, f'validate_{validator_name}', None)
+            if not validator_func:
+                continue
+
+            validator_args = validator.get('args', ())
+            validator_kwargs = validator.get('kwargs', {})
+
+            if not validator_func(value, *validator_args, **validator_kwargs):
+                return False, validator['message']
+
+        return True, None 
+
+    def validate_email(self, value):
+        if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', value):
+            return False, 'Invalid email address.'
+        return True, None
+
+    def validate_age(self, value, min_age, max_age):
+        # Implement age validation logic here
+        pass
+
+    def validate_password(self, value, min_length=8):
+        # Implement password validation logic here
+        pass
+
+    def validate_json(self, value):
+        # Implement JSON validation logic here
+        pass
+
+tests/test_validations.py:
+
+class TestDataValidation(unittest.TestCase):
+    def test_data_validation(self):
+        # Define the validation schema
+        schema = Schema({
+            'name': Field(required=True, type='string'),
+            'age': Field(required=True, type='integer', validators=[
+                {'name': 'min_age', 'args': (18,), 'message': 'Age must be at least 18.'},
+                {'name': 'max_age', 'args': (65,), 'message': 'Age must be at most 65.'}
+            ]),
+            'email': Field(required=True, type='string', validators=[
+                {'name': 'email', 'message': 'Invalid email address.'}
+            ])
+        })
+
+        # Create the data validator
+        data = {
+            'name': 'John Doe',
+            'age': 30,
+            'email': 'johndoe@example.com'
+        }
+        validator = DataValidator(schema, data)
+
+        # Test valid data
+        errors = validator.validate()
+        self.assertEqual(errors, {})  # No errors should be returned for valid data
+
+        # Test invalid data
+        invalid_data = {
+            'name': '',
+            'age': 16,
+            'email': 'invalid_email'
+        }
+        validator = DataValidator(schema, invalid_data)
+        errors = validator.validate()
+        expected_errors = {
+            'name': 'This field is required.',
+            'age': 'Age must be at least 18.',
+            'email': 'Invalid email address.'
+        }
+        self.assertEqual(errors, expected_errors)  # Expected errors should match the validation result
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+FAIL: test_data_validation (tests.test_validations.TestDataValidation.test_data_validation)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/mikef0x/Flask_Validators/tests/test_validations.py", line 45, in test_data_validation
+    self.assertEqual(errors, expected_errors)  # Expected errors should match the validation result
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {} != {'name': 'This field is required.', 'age':[58 chars]ss.'}
+- {}
++ {'age': 'Age must be at least 18.',
++  'email': 'Invalid email address.',
++  'name': 'This field is required.'}
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
