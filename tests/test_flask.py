@@ -17,4 +17,4 @@ def validate_data():
     return jsonify({'success': True, 'message': 'Data is valid.'})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True) 
