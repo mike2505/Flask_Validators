@@ -30,14 +30,14 @@ To use Flask Validator in your Flask application, follow these steps:
 You can install Flask Validator using pip:
 
 ```
-pip install Flask_Validator
+pip install flask_validators
 ```
 
 ### Getting Started
 1. Import the necessary modules and classes from Flask Validator:
 ```python
 from flask import Flask, request, jsonify
-from Flask_Validator import validate_form
+from flask_validators import validate_form
 ```
 
 2. Create a Flask application instance:
