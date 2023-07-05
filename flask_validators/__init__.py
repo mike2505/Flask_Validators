@@ -4,4 +4,4 @@ from .models.fields import Field
 from .controllers.validator import DataValidator
 
 
-__all__ = ["validate", "Schema", "Field", "DataValidator"]
+__all__ = ["validate_form", "Schema", "Field", "DataValidator"]

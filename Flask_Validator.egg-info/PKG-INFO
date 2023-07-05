@@ -1,0 +1,10 @@
+Metadata-Version: 2.1
+Name: Flask-Validator
+Version: 0.1
+Summary: Flask request validation
+Author: Dimitri Zhorzholiani
+Author-email: dimitri@jorjoliani.com
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: License :: OSI Approved :: MIT License
+Requires-Python: >=3.6
