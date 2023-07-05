@@ -1,4 +1,4 @@
-# FLask Validator
+# Flask Validator
 
 Flask Validator is a powerful package designed to simplify data validation in Flask applications. It provides an easy-to-use interface for defining data validation rules and seamlessly integrates with Flask routes using a custom decorator.
 
