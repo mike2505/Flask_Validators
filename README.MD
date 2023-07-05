@@ -35,18 +35,18 @@ pip install Flask_Validator
 
 ### Getting Started
 1. Import the necessary modules and classes from Flask Validator:
-```
+```python
 from flask import Flask, request, jsonify
 from Flask_Validator import validate_form
 ```
 
 2. Create a Flask application instance:
-```
+```python
 app = Flask(__name__)
 ```
 
 3. Define a route with the @validate_form decorator and specify the validation schema:
-```
+```python
 @app.route('/validate', methods=['POST'])
 @validate_form('age', 'name', 'email')
 def validate_data():
@@ -54,7 +54,7 @@ def validate_data():
 ```
 
 4. Run the Flask application:
-```
+```python
 if __name__ == '__main__':
     app.run(debug=True)
 ```
@@ -62,7 +62,7 @@ if __name__ == '__main__':
 Now, when a POST request is made to the /validate endpoint, Flask Validator will automatically validate the incoming data based on the specified schema. The @validate_form decorator is used to validate the fields 'age', 'name', and 'email'. If the data passes the validation, the route handler function (validate_data in this case) will be executed. Otherwise, Flask Validator will generate error messages and return a response with the error details.
 
 You can also define Validators with specific requirements
-```
+```python
 @app.route('/validate', methods=['POST'])
 @validate_form(
     Schema({
@@ -78,7 +78,7 @@ def validate_data():
 ## Validation Schema
 The validation schema is defined using the Schema class, which takes a dictionary representing the schema structure. Each field in the schema is associated with a set of validation rules.
 For example, the following schema validates an email field:
-```
+```python
 Schema({
     'email': Field(required=True, type='string', validators=[
         {'name': 'email', 'message': 'Invalid email address.'}
@@ -96,7 +96,7 @@ The Field class also provides built-in validation methods, such as validate_emai
 Flask Validator allows you to create custom validators to implement complex validation logic tailored to your application's needs. To create a custom validator, define a method within the Schema class that follows the validate_<validator_name> naming convention. This method should accept the field value and any additional arguments defined in the validation rule. It should return a tuple with a boolean indicating the validation result and an error message if the validation fails.
 
 For example, to create a custom validator named validate_custom, add the following method to the Schema class:
-```
+```python
 def validate_custom(self, value, argument1, argument2, ...):
     # Validation logic
     if valid:
