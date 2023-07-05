@@ -1,22 +1,63 @@
-# Flask_Validator
+Flask_Validator Cult Of Martians
+<img src="https://flask-validator.com/assets/logo.svg" align="right"
+  alt="Flask_Validator logo" width="120" height="178">
+
 Flask_Validator is a powerful package designed to simplify data validation in Flask applications. It provides an easy-to-use interface for defining data validation rules and seamlessly integrates with Flask routes using a custom decorator.
 
-### Installation
-You can install Flask_Validator using pip:
-```
-pip install Flask_Validator
-```
-### Getting Started
+Simplified Data Validation: Flask_Validator streamlines the process of validating data in Flask applications, reducing the complexity and boilerplate code.
+Integration with Flask Routes: The package seamlessly integrates with Flask routes through a custom decorator, making it easy to apply validation rules to specific endpoints.
+Flexible Validation Schema: Flask_Validator allows you to define validation rules using a schema structure, providing a clear and organized way to specify the expected data format.
+Custom Validators: You can create custom validators to extend the validation capabilities of Flask_Validator, enabling you to implement complex validation logic tailored to your application's needs.
+Error Handling: Flask_Validator automatically generates error messages based on the defined validation rules, simplifying the process of handling validation failures and providing meaningful feedback to the users.
+<p align="center">
+  <img src="https://flask-validator.com/assets/example.png" alt="Flask_Validator Example" width="738">
+</p>
+With the help of Flask_Validator, you can ensure the integrity and consistency of the data submitted to your Flask endpoints, enhancing the reliability and security of your application.
+
+<p align="center">
+  <a href="https://flask-validator.com/?utm_source=flask-validator">
+    <img src="https://flask-validator.com/assets/sponsored-by-evilmartians.svg"
+         alt="Sponsored by Evil Martians" width="236" height="54">
+  </a>
+</p>
+Who Uses Flask_Validator
+Awesome Flask
+Flask Mega-Tutorial
+Flask by Example
+How It Works
+Flask_Validator provides a custom decorator, @validate_form, which can be applied to Flask routes.
+The decorator takes a validation schema as its argument, defined using the Schema class and Field class from Flask_Validator.
+The validation schema specifies the structure of the expected data and the validation rules for each field.
+When a request is made to a decorated route, Flask_Validator automatically validates the incoming data based on the defined schema.
+If the data passes the validation, the route handler function is executed as usual.
+If the data fails the validation, Flask_Validator generates error messages based on the defined rules and returns a response with the error details.
+Usage
 To use Flask_Validator in your Flask application, follow these steps:
 
-```
+Installation
+You can install Flask_Validator using pip:
+
+sh
+Copy code
+pip install Flask_Validator
+Getting Started
+Import the necessary modules and classes from Flask_Validator:
+
+python
+Copy code
 from flask import Flask, request, jsonify
 from flask_data_validation.decorators.validation_decorator import validate_form
 from flask_data_validation.models.schema import Schema
 from flask_data_validation.models.fields import Field
+Create a Flask application instance:
 
+python
+Copy code
 app = Flask(__name__)
+Define a route with the @validate_form decorator and specify the validation schema:
 
+python
+Copy code
 @app.route('/validate', methods=['POST'])
 @validate_form(
     Schema({
@@ -27,48 +68,48 @@ app = Flask(__name__)
 )
 def validate_data():
     return jsonify({'success': True, 'message': 'Data is valid.'})
+Run the Flask application:
 
+python
+Copy code
 if __name__ == '__main__':
     app.run(debug=True)
-```
-    
-### Validation Schema
+Now, when a POST request is made to the /validate endpoint, Flask_Validator will automatically validate the incoming data based on the specified schema. If the data passes the validation, the route handler function (validate_data in this case) will be executed. Otherwise, Flask_Validator will generate error messages and return a response with the error details.
+
+Validation Schema
 The validation schema is defined using the Schema class, which takes a dictionary representing the schema structure. Each field in the schema is associated with a set of validation rules.
 
 For example, the following schema validates an email field:
 
-```
+python
+Copy code
 Schema({
     'email': Field(required=True, type='string', validators=[
         {'name': 'email', 'message': 'Invalid email address.'}
     ])
 })
-```
 In the example above, the email field is marked as required and expects a string value. It also applies an additional validator to check if the value is a valid email address.
 
-### Validation Rules
-Validation rules are defined using the Field class. Each field can have the following properties:
+Validation Rules
+Validation rules are defined using the Field class. Each field can have properties such as required (indicating if the field is required), type (specifying the expected data type), and validators (a list of additional validators to apply).
 
-required: Indicates if the field is required.
-type: Specifies the expected data type of the field (e.g., 'string', 'integer', 'float', 'boolean').
-validators: A list of additional validators to apply to the field.
-The Field class also provides several built-in validation methods, such as validate_email, validate_age, validate_name, validate_password, and validate_json. You can extend these methods or create your own custom validators.
+The Field class also provides built-in validation methods, such as validate_email, validate_age, validate_name, validate_password, and validate_json. These methods can be used directly or extended to implement custom validation logic.
 
-### Custom Validators
-To create a custom validator, define a method within the Schema class that follows the validate_<validator_name> naming convention. This method should accept the field value and any additional arguments defined in the validation rule. It should return a tuple of boolean and error message.
+Custom Validators
+Flask_Validator allows you to create custom validators to implement complex validation logic tailored to your application's needs. To create a custom validator, define a method within the Schema class that follows the validate_<validator_name> naming convention. This method should accept the field value and any additional arguments defined in the validation rule. It should return a tuple with a boolean indicating the validation result and an error message if the validation fails.
 
 For example, to create a custom validator named validate_custom, add the following method to the Schema class:
 
-```
+python
+Copy code
 def validate_custom(self, value, argument1, argument2, ...):
     # Validation logic
     if valid:
         return True, None
     else:
         return False, 'Validation failed.'
-```
-### Error Handling
-If validation fails, Flask_Validator automatically generates error messages based on the defined validation rules. The error response includes a JSON object with the field names as keys and the corresponding error messages as values.
+Error Handling
+If validation fails, Flask_Validator automatically generates error messages based on the defined validation rules. The error response includes a JSON object with the field names as keys and the corresponding error messages as values. This makes it easier to handle validation failures and provide meaningful feedback to the users.
 
-### Conclusion
-Flask_Validator simplifies the process of data validation in Flask applications. It provides a flexible and intuitive way to define validation rules and seamlessly integrate them into your routes. By using Flask_Validator, you can ensure the integrity and consistency of the data submitted to your Flask endpoints.
+Conclusion
+Flask_Validator simplifies the process of data validation in Flask applications by providing a user-friendly interface and seamless integration with Flask routes. By using Flask_Validator, you can ensure the integrity and consistency of the data submitted to your Flask endpoints, enhancing the reliability and security of your application. Give it a try in your Flask projects and experience the benefits of streamlined data validation.
