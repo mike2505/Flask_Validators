@@ -105,6 +105,9 @@ def validate_custom(self, value, argument1, argument2, ...):
         return False, 'Validation failed.'
 ```
 
+## Currently Working
+Currently I am working on database integration support, any help will be appreciated
+
 ## Error Handling
 If validation fails, Flask Validator automatically generates error messages based on the defined validation rules. The error response includes a JSON object with the field names as keys and the corresponding error messages as values. This makes it easier to handle validation failures and provide meaningful feedback to the users.
 
