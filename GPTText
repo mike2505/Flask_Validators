@@ -1,68 +1,266 @@
-Folder structure:
+fields.py:
 
-flask_data_validation/
-    |-- flask_data_validation/
-        |-- __init__.py
-        |-- decorators/
-            |-- __init__.py
-            |-- validation_decorator.py
-        |-- models/
-            |-- __init__.py
-            |-- schema.py
-            |-- fields.py
-        |-- controllers/
-            |-- __init__.py
-            |-- validator.py
-            |-- error_handler.py
-    |-- tests/
-        |-- __init__.py
-        |-- test_validations.py
-        |-- test_schemas.py
-    |-- docs/
-    |-- setup.py
-    |-- README.md
+import re
+import json
 
+from urllib.parse import urlparse
+from datetime import datetime
 
-flask_data_validation/controllers/validator.py:
+class Field:
+    def __init__(self, required=False, type=None, validators=None):
+        self.required = required
+        self.type = type
+        self.validators = validators or []
 
-class DataValidator:
-    def __init__(self, schema, data):
-        self.schema = schema
-        self.data = data
+    def validate(self, value):
+        if self.required and value is None:
+            return False, 'This field is required.'
 
-    def validate(self):
-        errors = {}
-        for field_name, field in self.schema.fields.items():
-            value = self.data.get(field_name)
-            if value is None and field.required:
-                errors[field_name] = 'This field is required.'
-            elif value is not None:
-                is_valid, error_message = field.validate(value)
-                if not is_valid:
-                    errors[field_name] = error_message
-        return errors
+        if self.type:
+            try:
+                if self.type == 'string':
+                    value = str(value)
+                elif self.type == 'integer':
+                    value = int(value)
+                elif self.type == 'float':
+                    value = float(value)
+                elif self.type == 'boolean':
+                    value = bool(value)
+            except ValueError:
+                return False, f'Expected a {self.type}.'
 
-flask_data_validation/decorators/validation_decorator.py
+            # Add more type validations as needed
+
+        for validator in self.validators:
+            validator_name = validator['name']
+            if validator_name == 'min_age':
+                validator_name = 'age'
+            elif validator_name == 'max_age':
+                validator_name = 'age'
+            elif validator_name == 'email':
+                validator_name = 'email'
+
+            validator_func = getattr(self, f'validate_{validator_name}', None)
+            if not validator_func:
+                continue
+
+            validator_args = validator.get('args', ())
+            validator_kwargs = validator.get('kwargs', {})
+
+            if validator_name == 'age':
+                min_age, max_age = validator_args
+                is_valid, error_message = validator_func(value, min_age, max_age, **validator_kwargs)
+            else:
+                is_valid, error_message = validator_func(value, *validator_args, **validator_kwargs)
+
+            if not is_valid:
+                custom_message = validator.get('message')
+                return False, custom_message if custom_message else error_message
+
+        return True, None
+
+    def validate_email(self, value):
+        if re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', value):
+            return True, None
+        return False, 'Invalid email address.'
+
+    def validate_name(self, value):
+        if isinstance(value, str) and value.strip():
+            return True, None
+        return False, 'Invalid name.'
+
+    def validate_age(self, value, min_age=0, max_age=120):
+        if isinstance(value, int) and min_age <= value <= max_age:
+            return True, None
+        return False, f'Age must be between {min_age} and {max_age}.'
+
+    def validate_password(self, value, min_length=8, max_length=16, require_special_char=True):
+        if isinstance(value, str) and min_length <= len(value) <= max_length:
+            if require_special_char and re.search(r'\W', value):
+                return True, None
+        return False, 'Invalid password.'
+
+    def validate_json(self, value):
+        try:
+            json.loads(value)
+            return True, None
+        except json.JSONDecodeError:
+            return False, 'Invalid JSON.'
+
+    def validate_phone(self, value):
+        if re.match(r'^\+?1?\d{9,15}$', value):
+            return True, None
+        return False, 'Invalid phone number.'
+
+    def validate_zipcode(self, value):
+        if re.match(r'^\d{5}(-\d{4})?$', value):  # US zipcode format
+            return True, None
+        return False, 'Invalid zipcode.'
+
+    def validate_date(self, value):
+        try:
+            datetime.strptime(value, '%Y-%m-%d')  # assuming date format to be 'YYYY-MM-DD'
+            return True, None
+        except ValueError:
+            return False, 'Invalid date.'
+
+    def validate_credit_card(self, value):
+        # naive check for 16 digit number with optional hyphens or spaces
+        if re.match(r'^(\d{4}[-\s]?){3}\d{4}$', value):
+            return True, None
+        return False, 'Invalid credit card number.'
+
+    def validate_ssn(self, value):
+        # naive check for US SSN (XXX-XX-XXXX)
+        if re.match(r'^\d{3}-\d{2}-\d{4}$', value):
+            return True, None
+        return False, 'Invalid social security number.'
+
+    def validate_url(self, value):
+        try:
+            result = urlparse(value)
+            return all([result.scheme, result.netloc]), 'Invalid URL.'
+        except ValueError:
+            return False, 'Invalid URL.'
+
+    def validate_ip_address(self, value):
+        if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', value):  # naive IPv4 check
+            return True, None
+        return False, 'Invalid IP address.'
+
+    def validate_hex_color(self, value):
+        if re.match(r'^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$', value):
+            return True, None
+        return False, 'Invalid hexadecimal color code.'
+
+    def validate_latitude(self, value):
+        if re.match(r'^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)$', value):
+            return True, None
+        return False, 'Invalid latitude.'
+
+    def validate_longitude(self, value):
+        if re.match(r'^[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$', value):
+            return True, None
+        return False, 'Invalid longitude.'
+
+    def validate_file(self, value, allowed_extensions=None, max_size=None):
+        if allowed_extensions and value.filename.split('.')[-1] not in allowed_extensions:
+            return False, 'Invalid file extension.'
+        
+        if max_size and value.content_length > max_size:
+            return False, 'File size is too large.'
+
+        return True, None
+
+    def validate_confirm_password(self, value, password_field):
+        password = self.data.get(password_field)
+        if password != value:
+            return False, 'Passwords must match.'
+        return True, None
+
+validation_decorator.py:
 
 from functools import wraps
 from flask import request, jsonify
-from flask_data_validation.controllers.validator import DataValidator
+from flask_validators.controllers.validator import DataValidator
+from flask_validators.models.schema import Schema
+from flask_validators.models.fields import Field
 
-def validate_form(schema):
+field_schemas = {
+    'email': Field(required=True, type='string', validators=[
+        {'name': 'email', 'message': 'Invalid email address.'}
+    ]),
+    'name': Field(required=True, type='string', validators=[
+        {'name': 'name', 'message': 'Invalid name.'}
+    ]),
+    'age': Field(required=True, type='integer', validators=[
+        {'name': 'age', 'message': 'Invalid age.', 'args': (0, 120)}
+    ]),
+    'password': Field(required=True, type='string', validators=[
+        {'name': 'password', 'message': 'Invalid password.', 'kwargs': {'min_length': 8, 'max_length': 16, 'require_special_char': True}}
+    ]),
+    'confirm_password': Field(required=True, type='string', validators=[
+        {'name': 'confirm_password', 'message': 'Passwords must match.', 'kwargs': {'password_field': 'password'}}
+    ]),
+    'json': Field(required=True, type='string', validators=[
+        {'name': 'json', 'message': 'Invalid JSON.'}
+    ]),
+    'phone': Field(required=True, type='string', validators=[
+        {'name': 'phone', 'message': 'Invalid phone number.'}
+    ]),
+    'zipcode': Field(required=True, type='string', validators=[
+        {'name': 'zipcode', 'message': 'Invalid zipcode.'}
+    ]),
+    'date': Field(required=True, type='string', validators=[
+        {'name': 'date', 'message': 'Invalid date.'}
+    ]),
+    'credit_card': Field(required=True, type='string', validators=[
+        {'name': 'credit_card', 'message': 'Invalid credit card number.'}
+    ]),
+    'ssn': Field(required=True, type='string', validators=[
+        {'name': 'ssn', 'message': 'Invalid social security number.'}
+    ]),
+    'url': Field(required=True, type='string', validators=[
+        {'name': 'url', 'message': 'Invalid URL.'}
+    ]),
+    'ip_address': Field(required=True, type='string', validators=[
+        {'name': 'ip_address', 'message': 'Invalid IP address.'}
+    ]),
+    'hex_color': Field(required=True, type='string', validators=[
+        {'name': 'hex_color', 'message': 'Invalid hexadecimal color code.'}
+    ]),
+    'latitude': Field(required=True, type='string', validators=[
+        {'name': 'latitude', 'message': 'Invalid latitude.'}
+    ]),
+    'longitude': Field(required=True, type='string', validators=[
+        {'name': 'longitude', 'message': 'Invalid longitude.'}
+    ]),
+    'file': Field(required=True, type='file', validators=[
+        {'name': 'file', 'message': 'Invalid file.', 'kwargs': {'allowed_extensions': ['jpg', 'png', 'pdf', 'txt'], 'max_size': 1024 * 1024 * 5}}  # 5MB
+    ]),
+}
+
+def validate_form(*fields):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            data = request.get_json()
-            errors = DataValidator(schema, data).validate()  # Updated line
+            data = request.form.to_dict()
+            file_data = {k: v for k, v in request.files.items() if k in fields}
+
+            if not data and not file_data:
+                return jsonify({'error': 'No data provided.'}), 400
+
+            errors = {}
+            for field in fields:
+                if field not in field_schemas:
+                    continue
+
+                schema = field_schemas[field]
+                schema.data = data  # Pass the whole data
+                value = data.get(field) if field in data else file_data.get(field)
+
+                if not value:
+                    errors[field] = "Missing data"
+                    continue
+
+                is_valid, error_message = schema.validate(value)
+                if not is_valid:
+                    errors[field] = error_message
+
             if errors:
                 return jsonify(errors), 400
+
             return f(*args, **kwargs)
         return decorated_function
     return decorator
 
-flask_data_validation/models/schema.py
+schema.py:
 
 import re
+import json
+
+from urllib.parse import urlparse
+from datetime import datetime
 
 class Schema:
     def __init__(self, schema):
@@ -108,136 +306,132 @@ class Schema:
         # Add more type validations as needed
 
     def validate_email(self, value):
-        if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', value):
-            return False, 'Invalid email address.'
-        return True, None
+        if re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', value):
+            return True, None
+        return False, 'Invalid email address.'
 
-    def validate_age(self, value, min_age, max_age):
-        # Implement age validation logic here
-        pass
+    def validate_name(self, value):
+        if isinstance(value, str) and value.strip():
+            return True, None
+        return False, 'Invalid name.'
 
-    def validate_password(self, value, min_length=8):
-        # Implement password validation logic here
-        pass
+    def validate_age(self, value, min_age=0, max_age=120):
+        if isinstance(value, int) and min_age <= value <= max_age:
+            return True, None
+        return False, f'Age must be between {min_age} and {max_age}.'
 
-    def validate_json(self, value):
-        # Implement JSON validation logic here
-        pass
-
-flask_data_validation/models/fields.py
-
-import re
-
-class Field:
-    def __init__(self, required=False, type=None, validators=None):
-        self.required = required
-        self.type = type
-        self.validators = validators or []
-
-    def validate(self, value):
-        if self.required and value is None:
-            return False, 'This field is required.'
-
-        if self.type:
-            if self.type == 'string' and not isinstance(value, str):
-                return False, 'Expected a string.'
-            elif self.type == 'integer' and not isinstance(value, int):
-                return False, 'Expected an integer.'
-            elif self.type == 'float' and not isinstance(value, float):
-                return False, 'Expected a float.'
-            elif self.type == 'boolean' and not isinstance(value, bool):
-                return False, 'Expected a boolean.'
-            # Add more type validations as needed
-
-        for validator in self.validators:
-            validator_name = validator['name']
-            validator_func = getattr(self, f'validate_{validator_name}', None)
-            if not validator_func:
-                continue
-
-            validator_args = validator.get('args', ())
-            validator_kwargs = validator.get('kwargs', {})
-
-            if not validator_func(value, *validator_args, **validator_kwargs):
-                return False, validator['message']
-
-        return True, None 
-
-    def validate_email(self, value):
-        if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', value):
-            return False, 'Invalid email address.'
-        return True, None
-
-    def validate_age(self, value, min_age, max_age):
-        # Implement age validation logic here
-        pass
-
-    def validate_password(self, value, min_length=8):
-        # Implement password validation logic here
-        pass
+    def validate_password(self, value, min_length=8, max_length=16, require_special_char=True):
+        if isinstance(value, str) and min_length <= len(value) <= max_length:
+            if require_special_char and re.search(r'\W', value):
+                return True, None
+        return False, 'Invalid password.'
 
     def validate_json(self, value):
-        # Implement JSON validation logic here
-        pass
+        try:
+            json.loads(value)
+            return True, None
+        except json.JSONDecodeError:
+            return False, 'Invalid JSON.'
 
-tests/test_validations.py:
+    def validate_phone(self, value):
+        if re.match(r'^\+?1?\d{9,15}$', value):
+            return True, None
+        return False, 'Invalid phone number.'
 
-class TestDataValidation(unittest.TestCase):
-    def test_data_validation(self):
-        # Define the validation schema
-        schema = Schema({
-            'name': Field(required=True, type='string'),
-            'age': Field(required=True, type='integer', validators=[
-                {'name': 'min_age', 'args': (18,), 'message': 'Age must be at least 18.'},
-                {'name': 'max_age', 'args': (65,), 'message': 'Age must be at most 65.'}
-            ]),
-            'email': Field(required=True, type='string', validators=[
-                {'name': 'email', 'message': 'Invalid email address.'}
-            ])
-        })
+    def validate_zipcode(self, value):
+        if re.match(r'^\d{5}(-\d{4})?$', value):  # US zipcode format
+            return True, None
+        return False, 'Invalid zipcode.'
 
-        # Create the data validator
-        data = {
-            'name': 'John Doe',
-            'age': 30,
-            'email': 'johndoe@example.com'
-        }
-        validator = DataValidator(schema, data)
+    def validate_date(self, value):
+        try:
+            datetime.strptime(value, '%Y-%m-%d')  # assuming date format to be 'YYYY-MM-DD'
+            return True, None
+        except ValueError:
+            return False, 'Invalid date.'
 
-        # Test valid data
-        errors = validator.validate()
-        self.assertEqual(errors, {})  # No errors should be returned for valid data
+    def validate_credit_card(self, value):
+        # naive check for 16 digit number with optional hyphens or spaces
+        if re.match(r'^(\d{4}[-\s]?){3}\d{4}$', value):
+            return True, None
+        return False, 'Invalid credit card number.'
 
-        # Test invalid data
-        invalid_data = {
-            'name': '',
-            'age': 16,
-            'email': 'invalid_email'
-        }
-        validator = DataValidator(schema, invalid_data)
-        errors = validator.validate()
-        expected_errors = {
-            'name': 'This field is required.',
-            'age': 'Age must be at least 18.',
-            'email': 'Invalid email address.'
-        }
-        self.assertEqual(errors, expected_errors)  # Expected errors should match the validation result
+    def validate_ssn(self, value):
+        # naive check for US SSN (XXX-XX-XXXX)
+        if re.match(r'^\d{3}-\d{2}-\d{4}$', value):
+            return True, None
+        return False, 'Invalid social security number.'
 
-if __name__ == '__main__':
-    unittest.main()
+    def validate_url(self, value):
+        try:
+            result = urlparse(value)
+            return all([result.scheme, result.netloc]), 'Invalid URL.'
+        except ValueError:
+            return False, 'Invalid URL.'
+
+    def validate_ip_address(self, value):
+        if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', value):  # naive IPv4 check
+            return True, None
+        return False, 'Invalid IP address.'
+
+    def validate_hex_color(self, value):
+        if re.match(r'^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$', value):
+            return True, None
+        return False, 'Invalid hexadecimal color code.'
+
+    def validate_latitude(self, value):
+        if re.match(r'^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)$', value):
+            return True, None
+        return False, 'Invalid latitude.'
+
+    def validate_longitude(self, value):
+        if re.match(r'^[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$', value):
+            return True, None
+        return False, 'Invalid longitude.'
+
+    def validate_file(self, value, allowed_extensions=None, max_size=None):
+        if allowed_extensions and value.filename.split('.')[-1] not in allowed_extensions:
+            return False, 'Invalid file extension.'
+        
+        if max_size and value.content_length > max_size:
+            return False, 'File size is too large.'
+
+        return True, None
+
+    def validate_confirm_password(self, value, password_field):
+        password = self.data.get(password_field)
+        if password != value:
+            return False, 'Passwords must match.'
+        return True, None
+
+validator.py:
+
+class DataValidator:
+    def __init__(self, schema, data):
+        self.schema = schema
+        self.data = data
+
+    def validate(self):
+        errors = {}
+        for field_name, field in self.schema.fields.items():
+            value = self.data.get(field_name)
+            if value is None and field.required:
+                errors[field_name] = 'This field is required.'
+            elif value is not None:
+                is_valid, error_message = field.validate(value)
+                if not is_valid:
+                    errors[field_name] = error_message
+        return errors
 
 
-FAIL: test_data_validation (tests.test_validations.TestDataValidation.test_data_validation)
-----------------------------------------------------------------------
-Traceback (most recent call last):
-  File "/home/mikef0x/Flask_Validators/tests/test_validations.py", line 45, in test_data_validation
-    self.assertEqual(errors, expected_errors)  # Expected errors should match the validation result
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError: {} != {'name': 'This field is required.', 'age':[58 chars]ss.'}
-- {}
-+ {'age': 'Age must be at least 18.',
-+  'email': 'Invalid email address.',
-+  'name': 'This field is required.'}
 
-----------------------------------------------------------------------
-Ran 1 test in 0.000s
+I want to implement database validator - I want to create new decrator - validate_db... let's start from easy and move to hard.
+
+Firstly help me implement unique checker, for example start with email and username, new validator should check if email already exists in database.
+
+
+It would work like this -
+
+user imports my package
+user specifies database (let's start with sqlalchemy support)
+user declares endpoint with validate_db decorator

@@ -1,15 +1,3 @@
-Metadata-Version: 2.1
-Name: flask-validators
-Version: 0.3
-Summary: Flask request validation
-Author: Dimitri Zhorzholiani
-Author-email: zhorzholiani.dimitri@gmail.com
-Classifier: Programming Language :: Python :: 3
-Classifier: Programming Language :: Python :: 3.9
-Classifier: License :: OSI Approved :: MIT License
-Requires-Python: >=3.6
-Description-Content-Type: text/markdown
-
 # Flask Validator
 
 Flask Validator is a powerful package designed to simplify data validation in Flask applications. It provides an easy-to-use interface for defining data validation rules and seamlessly integrates with Flask routes using a custom decorator.
@@ -20,6 +8,9 @@ Flask Validator is a powerful package designed to simplify data validation in Fl
 * **Custom Validators:** You can create custom validators to extend the validation capabilities of Flask Validator, enabling you to implement complex validation logic tailored to your application's needs.
 * **Error Handling:** Flask Validator automatically generates error messages based on the defined validation rules, simplifying the process of handling validation failures and providing 
 
+<p align="center">
+  <img src="./carbon.png" alt="CLI" width="738">
+</p>
 
 With the help of Flask Validator, you can ensure the integrity and consistency of the data submitted to your Flask endpoints, enhancing the reliability and security of your application.
 

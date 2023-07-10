@@ -8,9 +8,6 @@ Flask Validator is a powerful package designed to simplify data validation in Fl
 * **Custom Validators:** You can create custom validators to extend the validation capabilities of Flask Validator, enabling you to implement complex validation logic tailored to your application's needs.
 * **Error Handling:** Flask Validator automatically generates error messages based on the defined validation rules, simplifying the process of handling validation failures and providing 
 
-<p align="center">
-  <img src="./carbon.png" alt="Size Limit CLI" width="738">
-</p>
 
 With the help of Flask Validator, you can ensure the integrity and consistency of the data submitted to your Flask endpoints, enhancing the reliability and security of your application.
 

@@ -130,3 +130,18 @@ class Schema:
         if re.match(r'^[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$', value):
             return True, None
         return False, 'Invalid longitude.'
+
+    def validate_file(self, value, allowed_extensions=None, max_size=None):
+        if allowed_extensions and value.filename.split('.')[-1] not in allowed_extensions:
+            return False, 'Invalid file extension.'
+        
+        if max_size and value.content_length > max_size:
+            return False, 'File size is too large.'
+
+        return True, None
+
+    def validate_confirm_password(self, value, password_field):
+        password = self.data.get(password_field)
+        if password != value:
+            return False, 'Passwords must match.'
+        return True, None

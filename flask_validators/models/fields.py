@@ -15,14 +15,18 @@ class Field:
             return False, 'This field is required.'
 
         if self.type:
-            if self.type == 'string' and not isinstance(value, str):
-                return False, 'Expected a string.'
-            elif self.type == 'integer' and not isinstance(value, int):
-                return False, 'Expected an integer.'
-            elif self.type == 'float' and not isinstance(value, float):
-                return False, 'Expected a float.'
-            elif self.type == 'boolean' and not isinstance(value, bool):
-                return False, 'Expected a boolean.'
+            try:
+                if self.type == 'string':
+                    value = str(value)
+                elif self.type == 'integer':
+                    value = int(value)
+                elif self.type == 'float':
+                    value = float(value)
+                elif self.type == 'boolean':
+                    value = bool(value)
+            except ValueError:
+                return False, f'Expected a {self.type}.'
+
             # Add more type validations as needed
 
         for validator in self.validators:
@@ -48,7 +52,8 @@ class Field:
                 is_valid, error_message = validator_func(value, *validator_args, **validator_kwargs)
 
             if not is_valid:
-                return False, error_message
+                custom_message = validator.get('message')
+                return False, custom_message if custom_message else error_message
 
         return True, None
 
@@ -135,3 +140,18 @@ class Field:
         if re.match(r'^[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$', value):
             return True, None
         return False, 'Invalid longitude.'
+
+    def validate_file(self, value, allowed_extensions=None, max_size=None):
+        if allowed_extensions and value.filename.split('.')[-1] not in allowed_extensions:
+            return False, 'Invalid file extension.'
+        
+        if max_size and value.content_length > max_size:
+            return False, 'File size is too large.'
+
+        return True, None
+
+    def validate_confirm_password(self, value, password_field):
+        password = self.data.get(password_field)
+        if password != value:
+            return False, 'Passwords must match.'
+        return True, None

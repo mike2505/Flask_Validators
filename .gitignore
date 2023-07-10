@@ -1,1 +1,5 @@
 env
+GPTText
+tests
+Flask_Validator.egg-info
+flask_validators.egg-info
