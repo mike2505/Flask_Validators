@@ -5,7 +5,7 @@ with open('READMEPypi.md', 'r', encoding='utf-8') as f:
 
 setup(
     name="flask_validators",
-    version="0.4",
+    version="1.0",
     packages=find_packages(),
     description="Flask request validation",
     long_description=long_description,
@@ -19,8 +19,8 @@ setup(
     ],
     install_requires=[
         "flask",
-        "flask-sqlalchemy",
-        "",
+        "SQLAlchemy",
+        "langid",
     ],
     python_requires='>=3.6',
 )

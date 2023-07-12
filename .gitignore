@@ -12,10 +12,16 @@ build/
 
 # Environment
 env/
+test_env
 
 # Test directory
 tests/
 
 # Other specific directories or files to ignore
 Flask_Validator.egg-info/
+flask_data_validation.egg-info/
 flask_validators.egg-info/
+READMEPypi.md
+GPTText
+test_database.db
+test.sh

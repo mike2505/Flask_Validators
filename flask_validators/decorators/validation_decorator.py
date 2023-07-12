@@ -3,7 +3,8 @@ from flask import request, jsonify
 from flask_validators.controllers.validator import DataValidator
 from flask_validators.models.schema import Schema
 from flask_validators.models.fields import Field
-from flask_validators.models.validate_db import check_unique_fields
+from flask_validators.models.validate_db import check_unique, check_null, check_existence, check_range, check_type, check_enum, check_length
+from flask_validators.models.validate_llm import validate_language
 from sqlalchemy.orm import sessionmaker
 
 field_schemas = {
@@ -94,17 +95,72 @@ def validate_form(*fields):
         return decorated_function
     return decorator
 
-def validate_db(model_class, Session, unique_fields):
+def validate_db(model_class, Session, **validators):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             session = Session()
+            if request.is_json:
+                data = request.get_json()
+            else:
+                data = request.form.to_dict()
 
-            data = request.form.to_dict()
             errors = {}
 
-            # Check unique fields
-            errors.update(check_unique_fields(model_class, unique_fields, session, data))
+            for field, validator_func_names in validators.items():
+                value = data.get(field, None)  # Get the value, which may be None
+                # ensure validator_func_names is a list
+                if not isinstance(validator_func_names, list):
+                    validator_func_names = [validator_func_names]
+                for validator_func_name in validator_func_names:
+                    validator_func = globals().get(validator_func_name)
+                    if validator_func:
+                        is_valid, error_message = validator_func(model_class, session, value, {'field': field})
+                        if not is_valid:
+                            errors[field] = error_message
+
+            if errors:
+                return jsonify(errors), 400
+
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def validate_llm(**validators):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            errors = {}
+            lang = None  # Initialize lang as None
+
+            for field, validation_params in validators.items():
+                if field not in request.json:
+                    if validation_params[0] == 'validate_language':
+                        if field == 'lang':
+                            continue
+                        else:
+                            errors[field] = f'Missing {field} field.'
+                    continue
+
+                value = request.json[field]
+                if isinstance(validation_params, list):
+                    for validator_func_name in validation_params:
+                        validator_func = globals().get(validator_func_name)
+                        if validator_func:
+                            if validator_func_name == 'validate_language':
+                                lang = validators.get('lang', 'en')  # Retrieve lang parameter from validators dictionary
+                                is_valid, error_message = validator_func(value, desired_language=lang)
+                            else:
+                                is_valid, error_message = validator_func(value)
+
+                            if not is_valid:
+                                errors[field] = error_message
+                                break  # Exit the inner loop when an error occurs
+                        else:
+                            errors[field] = f'Invalid validator function: {validator_func_name}'
+                            break  # Exit the inner loop when an error occurs
+                else:
+                    errors[field] = 'Invalid validation parameters.'
 
             if errors:
                 return jsonify(errors), 400

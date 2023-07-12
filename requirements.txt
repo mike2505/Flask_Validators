@@ -1,0 +1,3 @@
+Flask==2.3.2
+langid==1.1.6
+SQLAlchemy==2.0.18

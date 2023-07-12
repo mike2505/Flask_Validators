@@ -1,4 +1,108 @@
-fields.py:
+Tree: 
+├── controllers
+│   ├── error_handler.py
+│   ├── __init__.py
+│   └── validator.py
+├── decorators
+│   ├── __init__.py
+│   └── validation_decorator.py
+├── __init__.py
+├── models
+│   ├── fields.py
+│   ├── __init__.py
+│   ├── schema.py
+│   └── validate_db.py
+
+
+controllers/validator.py:
+
+class DataValidator:
+    def __init__(self, schema, data):
+        self.schema = schema
+        self.data = data
+
+    def validate(self):
+        errors = {}
+        for field_name, field in self.schema.fields.items():
+            value = self.data.get(field_name)
+            if value is None and field.required:
+                errors[field_name] = 'This field is required.'
+            elif value is not None:
+                is_valid, error_message = field.validate(value)
+                if not is_valid:
+                    errors[field_name] = error_message
+        return errors
+
+decorators/validation_decorator.py:
+
+from functools import wraps
+from flask import request, jsonify
+from flask_validators.controllers.validator import DataValidator
+from flask_validators.models.schema import Schema
+from flask_validators.models.fields import Field
+from flask_validators.models.validate_db import check_unique_fields
+from sqlalchemy.orm import sessionmaker
+
+field_schemas = {HERE ARE SOME FIELDS }
+
+def validate_form(*fields):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            data = request.form.to_dict()
+            file_data = {k: v for k, v in request.files.items() if k in fields}
+
+            if not data and not file_data:
+                return jsonify({'error': 'No data provided.'}), 400
+
+            errors = {}
+            for field in fields:
+                if field not in field_schemas:
+                    continue
+
+                schema = field_schemas[field]
+                schema.data = data  # Pass the whole data
+                value = data.get(field) if field in data else file_data.get(field)
+
+                if not value:
+                    errors[field] = "Missing data"
+                    continue
+
+                is_valid, error_message = schema.validate(value)
+                if not is_valid:
+                    errors[field] = error_message
+
+            if errors:
+                return jsonify(errors), 400
+
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def validate_db(model_class, Session, **validators):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            session = Session()
+            data = request.form.to_dict()
+
+            errors = {}
+
+            for field, validator in validators.items():
+                value = data.get(field)
+                if value is not None:
+                    is_valid, error_message = validator(model_class, session, value, data)
+                    if not is_valid:
+                        errors[field] = error_message
+
+            if errors:
+                return jsonify(errors), 400
+
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+models/fields.py:
 
 import re
 import json
@@ -69,192 +173,9 @@ class Field:
             return True, None
         return False, 'Invalid name.'
 
-    def validate_age(self, value, min_age=0, max_age=120):
-        if isinstance(value, int) and min_age <= value <= max_age:
-            return True, None
-        return False, f'Age must be between {min_age} and {max_age}.'
+    def .... - HERE ARE ANOTHER FUNCTIONS WITH SAME STRUCTURE
 
-    def validate_password(self, value, min_length=8, max_length=16, require_special_char=True):
-        if isinstance(value, str) and min_length <= len(value) <= max_length:
-            if require_special_char and re.search(r'\W', value):
-                return True, None
-        return False, 'Invalid password.'
-
-    def validate_json(self, value):
-        try:
-            json.loads(value)
-            return True, None
-        except json.JSONDecodeError:
-            return False, 'Invalid JSON.'
-
-    def validate_phone(self, value):
-        if re.match(r'^\+?1?\d{9,15}$', value):
-            return True, None
-        return False, 'Invalid phone number.'
-
-    def validate_zipcode(self, value):
-        if re.match(r'^\d{5}(-\d{4})?$', value):  # US zipcode format
-            return True, None
-        return False, 'Invalid zipcode.'
-
-    def validate_date(self, value):
-        try:
-            datetime.strptime(value, '%Y-%m-%d')  # assuming date format to be 'YYYY-MM-DD'
-            return True, None
-        except ValueError:
-            return False, 'Invalid date.'
-
-    def validate_credit_card(self, value):
-        # naive check for 16 digit number with optional hyphens or spaces
-        if re.match(r'^(\d{4}[-\s]?){3}\d{4}$', value):
-            return True, None
-        return False, 'Invalid credit card number.'
-
-    def validate_ssn(self, value):
-        # naive check for US SSN (XXX-XX-XXXX)
-        if re.match(r'^\d{3}-\d{2}-\d{4}$', value):
-            return True, None
-        return False, 'Invalid social security number.'
-
-    def validate_url(self, value):
-        try:
-            result = urlparse(value)
-            return all([result.scheme, result.netloc]), 'Invalid URL.'
-        except ValueError:
-            return False, 'Invalid URL.'
-
-    def validate_ip_address(self, value):
-        if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', value):  # naive IPv4 check
-            return True, None
-        return False, 'Invalid IP address.'
-
-    def validate_hex_color(self, value):
-        if re.match(r'^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$', value):
-            return True, None
-        return False, 'Invalid hexadecimal color code.'
-
-    def validate_latitude(self, value):
-        if re.match(r'^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)$', value):
-            return True, None
-        return False, 'Invalid latitude.'
-
-    def validate_longitude(self, value):
-        if re.match(r'^[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$', value):
-            return True, None
-        return False, 'Invalid longitude.'
-
-    def validate_file(self, value, allowed_extensions=None, max_size=None):
-        if allowed_extensions and value.filename.split('.')[-1] not in allowed_extensions:
-            return False, 'Invalid file extension.'
-        
-        if max_size and value.content_length > max_size:
-            return False, 'File size is too large.'
-
-        return True, None
-
-    def validate_confirm_password(self, value, password_field):
-        password = self.data.get(password_field)
-        if password != value:
-            return False, 'Passwords must match.'
-        return True, None
-
-validation_decorator.py:
-
-from functools import wraps
-from flask import request, jsonify
-from flask_validators.controllers.validator import DataValidator
-from flask_validators.models.schema import Schema
-from flask_validators.models.fields import Field
-
-field_schemas = {
-    'email': Field(required=True, type='string', validators=[
-        {'name': 'email', 'message': 'Invalid email address.'}
-    ]),
-    'name': Field(required=True, type='string', validators=[
-        {'name': 'name', 'message': 'Invalid name.'}
-    ]),
-    'age': Field(required=True, type='integer', validators=[
-        {'name': 'age', 'message': 'Invalid age.', 'args': (0, 120)}
-    ]),
-    'password': Field(required=True, type='string', validators=[
-        {'name': 'password', 'message': 'Invalid password.', 'kwargs': {'min_length': 8, 'max_length': 16, 'require_special_char': True}}
-    ]),
-    'confirm_password': Field(required=True, type='string', validators=[
-        {'name': 'confirm_password', 'message': 'Passwords must match.', 'kwargs': {'password_field': 'password'}}
-    ]),
-    'json': Field(required=True, type='string', validators=[
-        {'name': 'json', 'message': 'Invalid JSON.'}
-    ]),
-    'phone': Field(required=True, type='string', validators=[
-        {'name': 'phone', 'message': 'Invalid phone number.'}
-    ]),
-    'zipcode': Field(required=True, type='string', validators=[
-        {'name': 'zipcode', 'message': 'Invalid zipcode.'}
-    ]),
-    'date': Field(required=True, type='string', validators=[
-        {'name': 'date', 'message': 'Invalid date.'}
-    ]),
-    'credit_card': Field(required=True, type='string', validators=[
-        {'name': 'credit_card', 'message': 'Invalid credit card number.'}
-    ]),
-    'ssn': Field(required=True, type='string', validators=[
-        {'name': 'ssn', 'message': 'Invalid social security number.'}
-    ]),
-    'url': Field(required=True, type='string', validators=[
-        {'name': 'url', 'message': 'Invalid URL.'}
-    ]),
-    'ip_address': Field(required=True, type='string', validators=[
-        {'name': 'ip_address', 'message': 'Invalid IP address.'}
-    ]),
-    'hex_color': Field(required=True, type='string', validators=[
-        {'name': 'hex_color', 'message': 'Invalid hexadecimal color code.'}
-    ]),
-    'latitude': Field(required=True, type='string', validators=[
-        {'name': 'latitude', 'message': 'Invalid latitude.'}
-    ]),
-    'longitude': Field(required=True, type='string', validators=[
-        {'name': 'longitude', 'message': 'Invalid longitude.'}
-    ]),
-    'file': Field(required=True, type='file', validators=[
-        {'name': 'file', 'message': 'Invalid file.', 'kwargs': {'allowed_extensions': ['jpg', 'png', 'pdf', 'txt'], 'max_size': 1024 * 1024 * 5}}  # 5MB
-    ]),
-}
-
-def validate_form(*fields):
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            data = request.form.to_dict()
-            file_data = {k: v for k, v in request.files.items() if k in fields}
-
-            if not data and not file_data:
-                return jsonify({'error': 'No data provided.'}), 400
-
-            errors = {}
-            for field in fields:
-                if field not in field_schemas:
-                    continue
-
-                schema = field_schemas[field]
-                schema.data = data  # Pass the whole data
-                value = data.get(field) if field in data else file_data.get(field)
-
-                if not value:
-                    errors[field] = "Missing data"
-                    continue
-
-                is_valid, error_message = schema.validate(value)
-                if not is_valid:
-                    errors[field] = error_message
-
-            if errors:
-                return jsonify(errors), 400
-
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
-
-schema.py:
+models/schema.py:
 
 import re
 import json
@@ -314,124 +235,84 @@ class Schema:
         if isinstance(value, str) and value.strip():
             return True, None
         return False, 'Invalid name.'
+ 
+    def .... - ANOTHER FUNCTIONS WITH SAME STRUCTURE
 
-    def validate_age(self, value, min_age=0, max_age=120):
-        if isinstance(value, int) and min_age <= value <= max_age:
-            return True, None
-        return False, f'Age must be between {min_age} and {max_age}.'
 
-    def validate_password(self, value, min_length=8, max_length=16, require_special_char=True):
-        if isinstance(value, str) and min_length <= len(value) <= max_length:
-            if require_special_char and re.search(r'\W', value):
-                return True, None
-        return False, 'Invalid password.'
+models/validate_db.py:
 
-    def validate_json(self, value):
-        try:
-            json.loads(value)
-            return True, None
-        except json.JSONDecodeError:
-            return False, 'Invalid JSON.'
+from functools import wraps
+from flask import request, jsonify
+from sqlalchemy.orm import sessionmaker
+import re
 
-    def validate_phone(self, value):
-        if re.match(r'^\+?1?\d{9,15}$', value):
-            return True, None
-        return False, 'Invalid phone number.'
+def check_unique(model_class, session, value, data):
+    query = session.query(model_class).filter(getattr(model_class, data.get('field')) == value).first()
+    if query and query.id != data.get('id'):  # Compare against the existing record's ID
+        return False, f'{data.get("field").capitalize()} already exists.'
+    return True, None
 
-    def validate_zipcode(self, value):
-        if re.match(r'^\d{5}(-\d{4})?$', value):  # US zipcode format
-            return True, None
-        return False, 'Invalid zipcode.'
+def check_null(model_class, session, value, data):
+    if not value:
+        return False, f'{data.get("field").capitalize()} is required.'
+    return True, None
 
-    def validate_date(self, value):
-        try:
-            datetime.strptime(value, '%Y-%m-%d')  # assuming date format to be 'YYYY-MM-DD'
-            return True, None
-        except ValueError:
-            return False, 'Invalid date.'
-
-    def validate_credit_card(self, value):
-        # naive check for 16 digit number with optional hyphens or spaces
-        if re.match(r'^(\d{4}[-\s]?){3}\d{4}$', value):
-            return True, None
-        return False, 'Invalid credit card number.'
-
-    def validate_ssn(self, value):
-        # naive check for US SSN (XXX-XX-XXXX)
-        if re.match(r'^\d{3}-\d{2}-\d{4}$', value):
-            return True, None
-        return False, 'Invalid social security number.'
-
-    def validate_url(self, value):
-        try:
-            result = urlparse(value)
-            return all([result.scheme, result.netloc]), 'Invalid URL.'
-        except ValueError:
-            return False, 'Invalid URL.'
-
-    def validate_ip_address(self, value):
-        if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', value):  # naive IPv4 check
-            return True, None
-        return False, 'Invalid IP address.'
-
-    def validate_hex_color(self, value):
-        if re.match(r'^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$', value):
-            return True, None
-        return False, 'Invalid hexadecimal color code.'
-
-    def validate_latitude(self, value):
-        if re.match(r'^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)$', value):
-            return True, None
-        return False, 'Invalid latitude.'
-
-    def validate_longitude(self, value):
-        if re.match(r'^[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$', value):
-            return True, None
-        return False, 'Invalid longitude.'
-
-    def validate_file(self, value, allowed_extensions=None, max_size=None):
-        if allowed_extensions and value.filename.split('.')[-1] not in allowed_extensions:
-            return False, 'Invalid file extension.'
-        
-        if max_size and value.content_length > max_size:
-            return False, 'File size is too large.'
-
-        return True, None
-
-    def validate_confirm_password(self, value, password_field):
-        password = self.data.get(password_field)
-        if password != value:
-            return False, 'Passwords must match.'
-        return True, None
-
-validator.py:
-
-class DataValidator:
-    def __init__(self, schema, data):
-        self.schema = schema
-        self.data = data
-
-    def validate(self):
-        errors = {}
-        for field_name, field in self.schema.fields.items():
-            value = self.data.get(field_name)
-            if value is None and field.required:
-                errors[field_name] = 'This field is required.'
-            elif value is not None:
-                is_valid, error_message = field.validate(value)
-                if not is_valid:
-                    errors[field_name] = error_message
-        return errors
+def check_existence(model_class, session, value, data):
+    id_value = value
+    if id_value:
+        query = session.query(model_class).filter(getattr(model_class, data.get('field')) == id_value).first()
+        if not query:
+            return False, f'{data.get("field").capitalize()} does not exist.'
+    return True, None
 
 
 
-I want to implement database validator - I want to create new decrator - validate_db... let's start from easy and move to hard.
+Here is exmaple flask:
 
-Firstly help me implement unique checker, for example start with email and username, new validator should check if email already exists in database.
+from flask import Flask, request, jsonify
+from flask_validators import validate_form, Schema, Field, DataValidator, validate_db
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
+app = Flask(__name__)
 
-It would work like this -
+database_url = 'sqlite:///test_database.db'
+engine = create_engine(database_url)
+Session = sessionmaker(bind=engine)
 
-user imports my package
-user specifies database (let's start with sqlalchemy support)
-user declares endpoint with validate_db decorator
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = 'users'
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String(50), unique=True)
+    email = Column(String(100), unique=True)
+
+Base.metadata.create_all(engine)
+
+Base.metadata.drop_all(engine, tables=[User.__table__])
+Base.metadata.create_all(engine)
+
+session = Session()
+user1 = User(username='testuser1', email='test1@example.com')
+user2 = User(username='testuser2', email='test2@example.com')
+session.add(user1)
+session.add(user2)
+session.commit()
+
+@app.route('/validate_unique', methods=['POST'])
+@validate_db(User, Session, username=check_unique, email=check_null)
+def validate_unique():
+    return jsonify({'success': True, 'message': 'Data is valid.'})
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+And I have error:
+Traceback (most recent call last):
+  File "/home/mikef0x/Flask_Validators/tests/test_flask.py", line 35, in <module>
+    @validate_db(User, Session, username=check_unique, email=check_null)
+                                         ^^^^^^^^^^^^
+NameError: name 'check_unique' is not defined
